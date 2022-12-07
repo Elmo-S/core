@@ -10,27 +10,14 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import DOMAIN
+from .hsl_api import HSL
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema({vol.Optional("api_key"): str})
-
-
-class PlaceholderHub:
-    """Placeholder class to make tests pass.
-
-    TODO Remove this placeholder class and replace with things from your PyPI package.
-    """
-
-    def __init__(self, api_key: str) -> None:
-        """Initialize."""
-        self.api_key = api_key
-
-    async def authenticate(self, api_key: str) -> bool:
-        """Test if we can authenticate with the host."""
-        return True
+STEP_USER_DATA_SCHEMA = vol.Schema({vol.Required("api_key"): str})
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -44,10 +31,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     # await hass.async_add_executor_job(
     #     your_validate_func, data["username"], data["password"]
     # )
+    session = async_get_clientsession(hass)
+    api = HSL(data["api_key"], session)
 
-    hub = PlaceholderHub(data["api_key"])
-
-    if not await hub.authenticate(data["api_key"]):
+    if not await api.authenticate():
         raise InvalidAuth
 
     # If you cannot connect:
