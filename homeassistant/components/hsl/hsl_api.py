@@ -28,3 +28,7 @@ class HSL:
         if not response.status == 200:
             return False
         return True
+
+    async def fetch_data(self) -> str:
+        """Fetch data."""
+        return "Buuuuuuip"
