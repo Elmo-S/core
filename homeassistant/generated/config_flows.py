@@ -199,6 +199,7 @@ FLOWS = {
         "homematicip_cloud",
         "homewizard",
         "honeywell",
+        "hsl",
         "huawei_lte",
         "hue",
         "huisbaasje",
