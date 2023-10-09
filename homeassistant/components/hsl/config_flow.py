@@ -27,14 +27,13 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     """
     session = async_get_clientsession(hass)
     api = HSL(data["api_key"], session)
+    await api.authenticate()
 
-    if not await api.authenticate():
-        raise InvalidAuth
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
+    # if return_code != 200:
+    # if return_code == 401:
+    # raise InvalidAuth
+    # else:
+    # raise CannotConnect
 
     # Return info that you want to store in the config entry.
     return {"title": "HSL"}
