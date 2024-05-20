@@ -1,4 +1,5 @@
 """Support for Xiaomi Gateways."""
+
 import asyncio
 from datetime import timedelta
 import logging
@@ -267,10 +268,8 @@ class XiaomiDevice(Entity):
         self.parse_data(device["data"], device["raw_data"])
         self.parse_voltage(device["data"])
 
-        if hasattr(self, "_data_key") and self._data_key:  # pylint: disable=no-member
-            self._unique_id = (
-                f"{self._data_key}{self._sid}"  # pylint: disable=no-member
-            )
+        if hasattr(self, "_data_key") and self._data_key:
+            self._unique_id = f"{self._data_key}{self._sid}"
         else:
             self._unique_id = f"{self._type}{self._sid}"
 
@@ -389,7 +388,7 @@ class XiaomiDevice(Entity):
 
     def parse_data(self, data, raw_data):
         """Parse data sent by gateway."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 def _add_gateway_to_schema(hass, schema):

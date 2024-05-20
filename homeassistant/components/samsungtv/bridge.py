@@ -1,4 +1,5 @@
 """samsungctl and samsungtvws bridge classes."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -7,7 +8,7 @@ from asyncio.exceptions import TimeoutError as AsyncioTimeoutError
 from collections.abc import Callable, Iterable, Mapping
 import contextlib
 from datetime import datetime, timedelta
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, cast
 
 from samsungctl import Remote
 from samsungctl.exceptions import AccessDenied, ConnectionClosed, UnhandledResponse
@@ -34,6 +35,7 @@ from samsungtvws.remote import ChannelEmitCommand, SendRemoteKey
 from websockets.exceptions import ConnectionClosedError, WebSocketException
 
 from homeassistant.const import (
+    CONF_DESCRIPTION,
     CONF_HOST,
     CONF_ID,
     CONF_METHOD,
@@ -50,7 +52,6 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_DESCRIPTION,
     CONF_SESSION_ID,
     ENCRYPTED_WEBSOCKET_PORT,
     LEGACY_PORT,
@@ -83,9 +84,6 @@ ENCRYPTED_MODEL_USES_POWER_OFF = {"H6400", "H6410"}
 ENCRYPTED_MODEL_USES_POWER = {"JU6400", "JU641D"}
 
 REST_EXCEPTIONS = (HttpApiError, AsyncioTimeoutError, ResponseError)
-
-_RemoteT = TypeVar("_RemoteT", SamsungTVWSAsyncRemote, SamsungTVEncryptedWSAsyncRemote)
-_CommandT = TypeVar("_CommandT", SamsungTVCommand, SamsungTVEncryptedCommand)
 
 
 def mac_from_device_info(info: dict[str, Any]) -> str | None:
@@ -392,7 +390,10 @@ class SamsungTVLegacyBridge(SamsungTVBridge):
             LOGGER.debug("Could not establish connection")
 
 
-class SamsungTVWSBaseBridge(SamsungTVBridge, Generic[_RemoteT, _CommandT]):
+class SamsungTVWSBaseBridge[
+    _RemoteT: (SamsungTVWSAsyncRemote, SamsungTVEncryptedWSAsyncRemote),
+    _CommandT: (SamsungTVCommand, SamsungTVEncryptedCommand),
+](SamsungTVBridge):
     """The Bridge for WebSocket TVs (v1/v2)."""
 
     def __init__(
@@ -548,7 +549,6 @@ class SamsungTVWSBridge(
                 return RESULT_AUTH_MISSING
             except (ConnectionFailure, OSError, AsyncioTimeoutError) as err:
                 LOGGER.debug("Failing config: %s, %s error: %s", config, type(err), err)
-        # pylint: disable-next=useless-else-on-loop
         else:  # noqa: PLW0120
             if result:
                 return result

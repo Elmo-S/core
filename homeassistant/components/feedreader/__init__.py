@@ -1,4 +1,5 @@
 """Support for RSS/Atom feeds."""
+
 from __future__ import annotations
 
 from calendar import timegm
@@ -17,7 +18,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.util.dt import utc_from_timestamp
+from homeassistant.util import dt as dt_util
 
 _LOGGER = getLogger(__name__)
 
@@ -116,7 +117,7 @@ class FeedManager:
     def _update(self) -> struct_time | None:
         """Update the feed and publish new entries to the event bus."""
         _LOGGER.debug("Fetching new data from feed %s", self._url)
-        self._feed: feedparser.FeedParserDict = feedparser.parse(  # type: ignore[no-redef]
+        self._feed = feedparser.parse(
             self._url,
             etag=None if not self._feed else self._feed.get("etag"),
             modified=None if not self._feed else self._feed.get("modified"),
@@ -197,35 +198,40 @@ class FeedManager:
             )
         entry.update({"feed_url": self._url})
         self._hass.bus.fire(self._event_type, entry)
+        _LOGGER.debug("New event fired for entry %s", entry.get("link"))
 
     def _publish_new_entries(self) -> None:
         """Publish new entries to the event bus."""
         assert self._feed is not None
-        new_entries = False
+        new_entry_count = 0
         self._last_entry_timestamp = self._storage.get_timestamp(self._feed_id)
         if self._last_entry_timestamp:
             self._firstrun = False
         else:
             # Set last entry timestamp as epoch time if not available
-            self._last_entry_timestamp = datetime.utcfromtimestamp(0).timetuple()
+            self._last_entry_timestamp = dt_util.utc_from_timestamp(0).timetuple()
+        # locally cache self._last_entry_timestamp so that entries published at identical times can be processed
+        last_entry_timestamp = self._last_entry_timestamp
         for entry in self._feed.entries:
             if (
                 self._firstrun
                 or (
                     "published_parsed" in entry
-                    and entry.published_parsed > self._last_entry_timestamp
+                    and entry.published_parsed > last_entry_timestamp
                 )
                 or (
                     "updated_parsed" in entry
-                    and entry.updated_parsed > self._last_entry_timestamp
+                    and entry.updated_parsed > last_entry_timestamp
                 )
             ):
                 self._update_and_fire_entry(entry)
-                new_entries = True
+                new_entry_count += 1
             else:
-                _LOGGER.debug("Entry %s already processed", entry)
-        if not new_entries:
+                _LOGGER.debug("Already processed entry %s", entry.get("link"))
+        if new_entry_count == 0:
             self._log_no_entries()
+        else:
+            _LOGGER.debug("%d entries published in feed %s", new_entry_count, self._url)
         self._firstrun = False
 
 
@@ -286,6 +292,6 @@ class StoredData:
     def _async_save_data(self) -> dict[str, str]:
         """Save feed data to storage."""
         return {
-            feed_id: utc_from_timestamp(timegm(struct_utc)).isoformat()
+            feed_id: dt_util.utc_from_timestamp(timegm(struct_utc)).isoformat()
             for feed_id, struct_utc in self._data.items()
         }

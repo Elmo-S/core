@@ -1,4 +1,5 @@
 """Support for tracking for iCloud devices."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -64,11 +65,7 @@ class IcloudTrackerEntity(TrackerEntity):
         self._account = account
         self._device = device
         self._unsub_dispatcher: CALLBACK_TYPE | None = None
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._device.unique_id
+        self._attr_unique_id = device.unique_id
 
     @property
     def location_accuracy(self):

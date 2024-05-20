@@ -1,4 +1,5 @@
 """Support for mobile_app push notifications."""
+
 from __future__ import annotations
 
 import asyncio
@@ -59,7 +60,6 @@ def push_registrations(hass):
     return targets
 
 
-# pylint: disable=invalid-name
 def log_rate_limits(hass, device_name, resp, level=logging.INFO):
     """Output rate limit log line at given level."""
     if ATTR_PUSH_RATE_LIMITS not in resp:
@@ -198,7 +198,7 @@ class MobileAppNotificationService(BaseNotificationService):
             else:
                 _LOGGER.error(message)
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _LOGGER.error("Timeout sending notification to %s", push_url)
         except aiohttp.ClientError as err:
             _LOGGER.error("Error sending notification to %s: %r", push_url, err)

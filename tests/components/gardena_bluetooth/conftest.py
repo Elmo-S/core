@@ -1,9 +1,10 @@
 """Common fixtures for the Gardena Bluetooth tests."""
+
 from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
-from freezegun import freeze_time
+from freezegun.api import FrozenDateTimeFactory
 from gardena_bluetooth.client import Client
 from gardena_bluetooth.const import DeviceInformation
 from gardena_bluetooth.exceptions import CharacteristicNotFound
@@ -49,19 +50,19 @@ def mock_read_char_raw():
 
 @pytest.fixture
 async def scan_step(
-    hass: HomeAssistant,
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> Generator[None, None, Callable[[], Awaitable[None]]]:
     """Step system time forward."""
 
-    with freeze_time("2023-01-01", tz_offset=1) as frozen_time:
+    freezer.move_to("2023-01-01T01:00:00Z")
 
-        async def delay():
-            """Trigger delay in system."""
-            frozen_time.tick(delta=SCAN_INTERVAL)
-            async_fire_time_changed(hass)
-            await hass.async_block_till_done()
+    async def delay():
+        """Trigger delay in system."""
+        freezer.tick(delta=SCAN_INTERVAL)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
 
-        yield delay
+    return delay
 
 
 @pytest.fixture(autouse=True)
@@ -87,11 +88,11 @@ def mock_client(
             val = mock_read_char_raw[uuid]
             if isinstance(val, Exception):
                 raise val
-            return val
         except KeyError:
             if default is SENTINEL:
                 raise CharacteristicNotFound from KeyError
             return default
+        return val
 
     def _all_char():
         return set(mock_read_char_raw.keys())
@@ -100,10 +101,13 @@ def mock_client(
     client.read_char_raw.side_effect = _read_char_raw
     client.get_all_characteristics_uuid.side_effect = _all_char
 
-    with patch(
-        "homeassistant.components.gardena_bluetooth.config_flow.Client",
-        return_value=client,
-    ), patch("homeassistant.components.gardena_bluetooth.Client", return_value=client):
+    with (
+        patch(
+            "homeassistant.components.gardena_bluetooth.config_flow.Client",
+            return_value=client,
+        ),
+        patch("homeassistant.components.gardena_bluetooth.Client", return_value=client),
+    ):
         yield client
 
 

@@ -1,4 +1,5 @@
 """Support for Template vacuums."""
+
 from __future__ import annotations
 
 import logging
@@ -264,8 +265,9 @@ class TemplateVacuum(TemplateEntity, StateVacuumEntity):
                 self._attr_fan_speed_list,
             )
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
+    @callback
+    def _async_setup_templates(self) -> None:
+        """Set up templates."""
         if self._template is not None:
             self.add_template_attribute(
                 "_state", self._template, None, self._update_state
@@ -285,7 +287,7 @@ class TemplateVacuum(TemplateEntity, StateVacuumEntity):
                 self._update_battery_level,
                 none_on_template_error=True,
             )
-        await super().async_added_to_hass()
+        super()._async_setup_templates()
 
     @callback
     def _update_state(self, result):

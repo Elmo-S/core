@@ -1,18 +1,19 @@
 """Managers for each table."""
 
-from collections.abc import MutableMapping
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Any
 
-from lru import LRU  # pylint: disable=no-name-in-module
+from lru import LRU
+
+from homeassistant.util.event_type import EventType
 
 if TYPE_CHECKING:
     from ..core import Recorder
 
-_DataT = TypeVar("_DataT")
 
-
-class BaseTableManager(Generic[_DataT]):
+class BaseTableManager[_DataT]:
     """Base class for table managers."""
+
+    _id_map: "LRU[EventType[Any] | str, int]"
 
     def __init__(self, recorder: "Recorder") -> None:
         """Initialize the table manager.
@@ -23,8 +24,7 @@ class BaseTableManager(Generic[_DataT]):
         """
         self.active = False
         self.recorder = recorder
-        self._pending: dict[str, _DataT] = {}
-        self._id_map: MutableMapping[str, int] = {}
+        self._pending: dict[EventType[Any] | str, _DataT] = {}
 
     def get_from_cache(self, data: str) -> int | None:
         """Resolve data to the id without accessing the underlying database.
@@ -34,7 +34,7 @@ class BaseTableManager(Generic[_DataT]):
         """
         return self._id_map.get(data)
 
-    def get_pending(self, shared_data: str) -> _DataT | None:
+    def get_pending(self, shared_data: EventType[Any] | str) -> _DataT | None:
         """Get pending data that have not be assigned ids yet.
 
         This call is not thread-safe and must be called from the
@@ -52,7 +52,7 @@ class BaseTableManager(Generic[_DataT]):
         self._pending.clear()
 
 
-class BaseLRUTableManager(BaseTableManager[_DataT]):
+class BaseLRUTableManager[_DataT](BaseTableManager[_DataT]):
     """Base class for LRU table managers."""
 
     def __init__(self, recorder: "Recorder", lru_size: int) -> None:
@@ -62,7 +62,7 @@ class BaseLRUTableManager(BaseTableManager[_DataT]):
         and evict the least recently used items when the cache is full.
         """
         super().__init__(recorder)
-        self._id_map: MutableMapping[str, int] = LRU(lru_size)
+        self._id_map = LRU(lru_size)
 
     def adjust_lru_size(self, new_size: int) -> None:
         """Adjust the LRU cache size.
@@ -70,6 +70,6 @@ class BaseLRUTableManager(BaseTableManager[_DataT]):
         This call is not thread-safe and must be called from the
         recorder thread.
         """
-        lru: LRU = self._id_map
+        lru = self._id_map
         if new_size > lru.get_size():
             lru.set_size(new_size)

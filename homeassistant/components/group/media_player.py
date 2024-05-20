@@ -1,7 +1,8 @@
 """Platform allowing several media players to be grouped into one media player."""
+
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import suppress
 from typing import Any
 
@@ -44,14 +45,18 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import (
-    EventStateChangedData,
-    async_track_state_change_event,
-)
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType, EventType
+from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 KEY_ANNOUNCE = "announce"
 KEY_CLEAR_PLAYLIST = "clear_playlist"
@@ -107,8 +112,22 @@ async def async_setup_entry(
     )
 
 
+@callback
+def async_create_preview_media_player(
+    hass: HomeAssistant, name: str, validated_config: dict[str, Any]
+) -> MediaPlayerGroup:
+    """Create a preview sensor."""
+    return MediaPlayerGroup(
+        None,
+        name,
+        validated_config[CONF_ENTITIES],
+    )
+
+
 class MediaPlayerGroup(MediaPlayerEntity):
     """Representation of a Media Group."""
+
+    _unrecorded_attributes = frozenset({ATTR_ENTITY_ID})
 
     _attr_available: bool = False
     _attr_should_poll = False
@@ -133,13 +152,14 @@ class MediaPlayerGroup(MediaPlayerEntity):
         }
 
     @callback
-    def async_on_state_change(self, event: EventType[EventStateChangedData]) -> None:
+    def async_on_state_change(self, event: Event[EventStateChangedData]) -> None:
         """Update supported features and state when a new state is received."""
         self.async_set_context(event.context)
         self.async_update_supported_features(
             event.data["entity_id"], event.data["new_state"]
         )
-        self.async_update_state()
+        self.async_update_group_state()
+        self.async_write_ha_state()
 
     @callback
     def async_update_supported_features(
@@ -208,6 +228,27 @@ class MediaPlayerGroup(MediaPlayerEntity):
         else:
             self._features[KEY_ENQUEUE].discard(entity_id)
 
+    @callback
+    def async_start_preview(
+        self,
+        preview_callback: Callable[[str, Mapping[str, Any]], None],
+    ) -> CALLBACK_TYPE:
+        """Render a preview."""
+
+        @callback
+        def async_state_changed_listener(
+            event: Event[EventStateChangedData] | None,
+        ) -> None:
+            """Handle child updates."""
+            self.async_update_group_state()
+            calculated_state = self._async_calculate_state()
+            preview_callback(calculated_state.state, calculated_state.attributes)
+
+        async_state_changed_listener(None)
+        return async_track_state_change_event(
+            self.hass, self._entities, async_state_changed_listener
+        )
+
     async def async_added_to_hass(self) -> None:
         """Register listeners."""
         for entity_id in self._entities:
@@ -216,7 +257,8 @@ class MediaPlayerGroup(MediaPlayerEntity):
         async_track_state_change_event(
             self.hass, self._entities, self.async_on_state_change
         )
-        self.async_update_state()
+        self.async_update_group_state()
+        self.async_write_ha_state()
 
     @property
     def name(self) -> str:
@@ -391,7 +433,7 @@ class MediaPlayerGroup(MediaPlayerEntity):
                 await self.async_set_volume_level(max(0, volume_level - 0.1))
 
     @callback
-    def async_update_state(self) -> None:
+    def async_update_group_state(self) -> None:
         """Query all members and determine the media group state."""
         states = [
             state.state
@@ -455,4 +497,3 @@ class MediaPlayerGroup(MediaPlayerEntity):
             supported_features |= MediaPlayerEntityFeature.MEDIA_ENQUEUE
 
         self._attr_supported_features = supported_features
-        self.async_write_ha_state()

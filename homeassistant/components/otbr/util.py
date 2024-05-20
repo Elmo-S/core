@@ -1,11 +1,13 @@
 """Utility functions for the Open Thread Border Router integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 import dataclasses
 from functools import wraps
 import logging
-from typing import Any, Concatenate, ParamSpec, TypeVar, cast
+import random
+from typing import Any, Concatenate, cast
 
 import python_otbr_api
 from python_otbr_api import PENDING_DATASET_DELAY_TIMER, tlv_parser
@@ -14,7 +16,7 @@ from python_otbr_api.tlv_parser import MeshcopTLVType
 
 from homeassistant.components.homeassistant_hardware.silabs_multiprotocol_addon import (
     MultiprotocolAddonManager,
-    get_addon_manager,
+    get_multiprotocol_addon_manager,
     is_multiprotocol_url,
     multi_pan_addon_using_device,
 )
@@ -24,9 +26,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
-
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,8 +47,19 @@ INSECURE_PASSPHRASES = (
 )
 
 
-def _handle_otbr_error(
-    func: Callable[Concatenate[OTBRData, _P], Coroutine[Any, Any, _R]]
+def compose_default_network_name(pan_id: int) -> str:
+    """Generate a default network name."""
+    return f"ha-thread-{pan_id:04x}"
+
+
+def generate_random_pan_id() -> int:
+    """Generate a random PAN ID."""
+    # PAN ID is 2 bytes, 0xffff is reserved for broadcast
+    return random.randint(0, 0xFFFE)
+
+
+def _handle_otbr_error[**_P, _R](
+    func: Callable[Concatenate[OTBRData, _P], Coroutine[Any, Any, _R]],
 ) -> Callable[Concatenate[OTBRData, _P], Coroutine[Any, Any, _R]]:
     """Handle OTBR errors."""
 
@@ -146,8 +156,10 @@ async def get_allowed_channel(hass: HomeAssistant, otbr_url: str) -> int | None:
         # The OTBR is not sharing the radio, no restriction
         return None
 
-    addon_manager: MultiprotocolAddonManager = await get_addon_manager(hass)
-    return addon_manager.async_get_channel()
+    multipan_manager: MultiprotocolAddonManager = await get_multiprotocol_addon_manager(
+        hass
+    )
+    return multipan_manager.async_get_channel()
 
 
 async def _warn_on_channel_collision(

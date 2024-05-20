@@ -1,10 +1,11 @@
 """The ATEN PE switch component."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from atenpdu import AtenPE, AtenPEError  # pylint: disable=import-error
+from atenpdu import AtenPE, AtenPEError
 import voluptuous as vol
 
 from homeassistant.components.switch import (
@@ -79,11 +80,9 @@ async def async_setup_platform(
         sw_version=sw_version,
     )
 
-    switches = []
-    async for outlet in outlets:
-        switches.append(AtenSwitch(dev, info, mac, outlet.id, outlet.name))
-
-    async_add_entities(switches, True)
+    async_add_entities(
+        (AtenSwitch(dev, info, mac, outlet.id, outlet.name) for outlet in outlets), True
+    )
 
 
 class AtenSwitch(SwitchEntity):

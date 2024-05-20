@@ -1,4 +1,5 @@
 """Coordinator for BMW."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -32,8 +33,6 @@ class BMWDataUpdateCoordinator(DataUpdateCoordinator[None]):
             entry.data[CONF_PASSWORD],
             get_region_from_name(entry.data[CONF_REGION]),
             observer_position=GPSPosition(hass.config.latitude, hass.config.longitude),
-            # Force metric system as BMW API apparently only returns metric values now
-            use_metric_units=True,
         )
         self.read_only = entry.options[CONF_READ_ONLY]
         self._entry = entry
@@ -51,6 +50,9 @@ class BMWDataUpdateCoordinator(DataUpdateCoordinator[None]):
             update_interval=timedelta(seconds=SCAN_INTERVALS[entry.data[CONF_REGION]]),
         )
 
+        # Default to false on init so _async_update_data logic works
+        self.last_update_success = False
+
     async def _async_update_data(self) -> None:
         """Fetch data from BMW."""
         old_refresh_token = self.account.refresh_token
@@ -58,7 +60,10 @@ class BMWDataUpdateCoordinator(DataUpdateCoordinator[None]):
         try:
             await self.account.get_vehicles()
         except MyBMWAuthError as err:
-            # Clear refresh token and trigger reauth
+            # Allow one retry interval before raising AuthFailed to avoid flaky API issues
+            if self.last_update_success:
+                raise UpdateFailed(err) from err
+            # Clear refresh token and trigger reauth if previous update failed as well
             self._update_config_entry_refresh_token(None)
             raise ConfigEntryAuthFailed(err) from err
         except (MyBMWAPIError, RequestError) as err:

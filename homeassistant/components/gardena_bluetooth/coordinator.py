@@ -1,4 +1,5 @@
 """Provides the DataUpdateCoordinator."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -12,7 +13,6 @@ from gardena_bluetooth.exceptions import (
 )
 from gardena_bluetooth.parse import Characteristic, CharacteristicType
 
-from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -117,18 +117,19 @@ class GardenaBluetoothEntity(CoordinatorEntity[Coordinator]):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return super().available and bluetooth.async_address_present(
-            self.hass, self.coordinator.address, True
-        )
+        return self.coordinator.last_update_success and self._attr_available
 
 
 class GardenaBluetoothDescriptorEntity(GardenaBluetoothEntity):
     """Coordinator entity for entities with entity description."""
 
     def __init__(
-        self, coordinator: Coordinator, description: EntityDescription
+        self,
+        coordinator: Coordinator,
+        description: EntityDescription,
+        context: set[str],
     ) -> None:
         """Initialize description entity."""
-        super().__init__(coordinator, {description.key})
+        super().__init__(coordinator, context)
         self._attr_unique_id = f"{coordinator.address}-{description.key}"
         self.entity_description = description

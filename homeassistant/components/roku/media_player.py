@@ -1,4 +1,5 @@
 """Support for the Roku media player."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -122,20 +123,20 @@ class RokuMediaPlayer(RokuEntity, MediaPlayerEntity):
         | MediaPlayerEntityFeature.BROWSE_MEDIA
     )
 
+    def __init__(self, coordinator: RokuDataUpdateCoordinator) -> None:
+        """Initialize the Roku device."""
+        super().__init__(coordinator=coordinator)
+        if coordinator.data.info.device_type == "tv":
+            self._attr_device_class = MediaPlayerDeviceClass.TV
+        else:
+            self._attr_device_class = MediaPlayerDeviceClass.RECEIVER
+
     def _media_playback_trackable(self) -> bool:
         """Detect if we have enough media data to track playback."""
         if self.coordinator.data.media is None or self.coordinator.data.media.live:
             return False
 
         return self.coordinator.data.media.duration > 0
-
-    @property
-    def device_class(self) -> MediaPlayerDeviceClass:
-        """Return the class of this device."""
-        if self.coordinator.data.info.device_type == "tv":
-            return MediaPlayerDeviceClass.TV
-
-        return MediaPlayerDeviceClass.RECEIVER
 
     @property
     def state(self) -> MediaPlayerState | None:
@@ -254,9 +255,12 @@ class RokuMediaPlayer(RokuEntity, MediaPlayerEntity):
     @property
     def source_list(self) -> list[str]:
         """List of available input sources."""
-        return ["Home"] + sorted(
-            app.name for app in self.coordinator.data.apps if app.name is not None
-        )
+        return [
+            "Home",
+            *sorted(
+                app.name for app in self.coordinator.data.apps if app.name is not None
+            ),
+        ]
 
     @roku_exception_handler()
     async def search(self, keyword: str) -> None:

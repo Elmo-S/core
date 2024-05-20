@@ -1,4 +1,5 @@
 """Generic entity for Garages Amsterdam."""
+
 from __future__ import annotations
 
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -14,6 +15,7 @@ class GaragesAmsterdamEntity(CoordinatorEntity):
     """Base Entity for garages amsterdam data."""
 
     _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
 
     def __init__(
         self, coordinator: DataUpdateCoordinator, garage_name: str, info_type: str

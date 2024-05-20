@@ -1,4 +1,5 @@
 """Test nest diagnostics."""
+
 from unittest.mock import patch
 
 from google_nest_sdm.exceptions import SubscriberException
@@ -60,7 +61,7 @@ CAMERA_API_DATA = {
     "type": "sdm.devices.types.CAMERA",
     "traits": {
         "sdm.devices.traits.CameraLiveStream": {
-            "videoCodecs": "H264",
+            "videoCodecs": ["H264"],
             "supportedProtocols": ["RTSP"],
         },
     },
@@ -71,7 +72,7 @@ CAMERA_DIAGNOSTIC_DATA = {
         "name": "**REDACTED**",
         "traits": {
             "sdm.devices.traits.CameraLiveStream": {
-                "videoCodecs": "H264",
+                "videoCodecs": ["H264"],
                 "supportedProtocols": ["RTSP"],
             },
         },
