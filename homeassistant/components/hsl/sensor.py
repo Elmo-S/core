@@ -38,6 +38,7 @@ async def async_setup_entry(
 class PublicTransportSensor(SensorEntity):
     """HSL transport integration class."""
 
+
     def __init__(self, name, station) -> None:
         """Initialize the sensor."""
         self._name = name

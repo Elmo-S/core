@@ -17,7 +17,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})
 
-    hass.states.async_set("hsl.testi", "Bängin")
+
+    hass.states.async_set("hsl.testi", "Hengissä")
+
 
     session = async_get_clientsession(hass)
     api_key = entry.options.get("api_key")

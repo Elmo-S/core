@@ -1,6 +1,6 @@
 """Library for HSL API."""
-from datetime import datetime
 
+from datetime import datetime
 import aiohttp
 
 from .const import API_URL
@@ -12,6 +12,7 @@ class HSL:
     def __init__(self, api_key, session: aiohttp.ClientSession) -> None:
         """Initialize API instance."""
         self.url = API_URL
+
         self.api_key = api_key
         self._session = session
         self.header = {
