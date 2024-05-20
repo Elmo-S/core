@@ -1,4 +1,5 @@
 """Support for NSW Rural Fire Service Feeds."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -21,7 +22,7 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     EVENT_HOMEASSISTANT_START,
     EVENT_HOMEASSISTANT_STOP,
-    LENGTH_KILOMETERS,
+    UnitOfLength,
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import aiohttp_client, config_validation as cv
@@ -177,11 +178,11 @@ class NswRuralFireServiceFeedEntityManager:
 
 
 class NswRuralFireServiceLocationEvent(GeolocationEvent):
-    """This represents an external event with NSW Rural Fire Service data."""
+    """Represents an external event with NSW Rural Fire Service data."""
 
     _attr_should_poll = False
     _attr_source = SOURCE
-    _attr_unit_of_measurement = LENGTH_KILOMETERS
+    _attr_unit_of_measurement = UnitOfLength.KILOMETERS
 
     def __init__(
         self, feed_manager: NswRuralFireServiceFeedEntityManager, external_id: str

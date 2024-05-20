@@ -1,13 +1,13 @@
 """Support for Big Ass Fans binary sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional, cast
+from typing import cast
 
 from aiobafi6 import Device
 
-from homeassistant import config_entries
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -16,44 +16,35 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from . import BAFConfigEntry
 from .entity import BAFEntity
-from .models import BAFData
 
 
-@dataclass
-class BAFBinarySensorDescriptionMixin:
-    """Required values for BAF binary sensors."""
-
-    value_fn: Callable[[Device], bool | None]
-
-
-@dataclass
+@dataclass(frozen=True, kw_only=True)
 class BAFBinarySensorDescription(
     BinarySensorEntityDescription,
-    BAFBinarySensorDescriptionMixin,
 ):
     """Class describing BAF binary sensor entities."""
+
+    value_fn: Callable[[Device], bool | None]
 
 
 OCCUPANCY_SENSORS = (
     BAFBinarySensorDescription(
         key="occupancy",
-        name="Occupancy",
         device_class=BinarySensorDeviceClass.OCCUPANCY,
-        value_fn=lambda device: cast(Optional[bool], device.fan_occupancy_detected),
+        value_fn=lambda device: cast(bool | None, device.fan_occupancy_detected),
     ),
 )
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: config_entries.ConfigEntry,
+    entry: BAFConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up BAF binary sensors."""
-    data: BAFData = hass.data[DOMAIN][entry.entry_id]
-    device = data.device
+    device = entry.runtime_data
     sensors_descriptions: list[BAFBinarySensorDescription] = []
     if device.has_occupancy:
         sensors_descriptions.extend(OCCUPANCY_SENSORS)
@@ -70,7 +61,7 @@ class BAFBinarySensor(BAFEntity, BinarySensorEntity):
     def __init__(self, device: Device, description: BAFBinarySensorDescription) -> None:
         """Initialize the entity."""
         self.entity_description = description
-        super().__init__(device, f"{device.name} {description.name}")
+        super().__init__(device)
         self._attr_unique_id = f"{self._device.mac_address}-{description.key}"
 
     @callback

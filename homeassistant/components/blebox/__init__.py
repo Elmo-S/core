@@ -1,6 +1,6 @@
 """The BleBox devices integration."""
+
 import logging
-from typing import Generic, TypeVar
 
 from blebox_uniapi.box import Box
 from blebox_uniapi.error import Error
@@ -8,13 +8,20 @@ from blebox_uniapi.feature import Feature
 from blebox_uniapi.session import ApiHost
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT, Platform
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USERNAME,
+    Platform,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 
 from .const import DEFAULT_SETUP_TIMEOUT, DOMAIN, PRODUCT
+from .helpers import get_maybe_authenticated_session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,16 +37,18 @@ PLATFORMS = [
 
 PARALLEL_UPDATES = 0
 
-_FeatureT = TypeVar("_FeatureT", bound=Feature)
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up BleBox devices from a config entry."""
-    websession = async_get_clientsession(hass)
-
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
+
+    username = entry.data.get(CONF_USERNAME)
+    password = entry.data.get(CONF_PASSWORD)
+
     timeout = DEFAULT_SETUP_TIMEOUT
+
+    websession = get_maybe_authenticated_session(hass, password, username)
 
     api_host = ApiHost(host, port, timeout, websession, hass.loop)
 
@@ -68,7 +77,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-class BleBoxEntity(Entity, Generic[_FeatureT]):
+class BleBoxEntity[_FeatureT: Feature](Entity):
     """Implements a common class for entities representing a BleBox feature."""
 
     def __init__(self, feature: _FeatureT) -> None:
@@ -83,6 +92,7 @@ class BleBoxEntity(Entity, Generic[_FeatureT]):
             model=product.model,
             name=product.name,
             sw_version=product.firmware_version,
+            configuration_url=f"http://{product.address}",
         )
 
     async def async_update(self) -> None:

@@ -1,4 +1,5 @@
 """Provide add-on management."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,9 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import partial, wraps
 import logging
-from typing import Any, TypeVar
-
-from typing_extensions import Concatenate, ParamSpec
+from typing import Any, Concatenate
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -29,22 +28,22 @@ from .handler import (
     async_update_addon,
 )
 
-_AddonManagerT = TypeVar("_AddonManagerT", bound="AddonManager")
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
+type _FuncType[_T, **_P, _R] = Callable[Concatenate[_T, _P], Awaitable[_R]]
+type _ReturnFuncType[_T, **_P, _R] = Callable[
+    Concatenate[_T, _P], Coroutine[Any, Any, _R]
+]
 
 
-def api_error(
+def api_error[_AddonManagerT: AddonManager, **_P, _R](
     error_message: str,
 ) -> Callable[
-    [Callable[Concatenate[_AddonManagerT, _P], Awaitable[_R]]],
-    Callable[Concatenate[_AddonManagerT, _P], Coroutine[Any, Any, _R]],
+    [_FuncType[_AddonManagerT, _P, _R]], _ReturnFuncType[_AddonManagerT, _P, _R]
 ]:
     """Handle HassioAPIError and raise a specific AddonError."""
 
     def handle_hassio_api_error(
-        func: Callable[Concatenate[_AddonManagerT, _P], Awaitable[_R]]
-    ) -> Callable[Concatenate[_AddonManagerT, _P], Coroutine[Any, Any, _R]]:
+        func: _FuncType[_AddonManagerT, _P, _R],
+    ) -> _ReturnFuncType[_AddonManagerT, _P, _R]:
         """Handle a HassioAPIError."""
 
         @wraps(func)
@@ -70,6 +69,7 @@ def api_error(
 class AddonInfo:
     """Represent the current add-on info state."""
 
+    available: bool
     hostname: str | None
     options: dict[str, Any]
     state: AddonState
@@ -144,6 +144,7 @@ class AddonManager:
         self._logger.debug("Add-on store info: %s", addon_store_info)
         if not addon_store_info["installed"]:
             return AddonInfo(
+                available=addon_store_info["available"],
                 hostname=None,
                 options={},
                 state=AddonState.NOT_INSTALLED,
@@ -154,6 +155,7 @@ class AddonManager:
         addon_info = await async_get_addon_info(self._hass, self.addon_slug)
         addon_state = self.async_get_addon_state(addon_info)
         return AddonInfo(
+            available=addon_info["available"],
             hostname=addon_info["hostname"],
             options=addon_info["options"],
             state=addon_state,
@@ -184,6 +186,11 @@ class AddonManager:
     @api_error("Failed to install the {addon_name} add-on")
     async def async_install_addon(self) -> None:
         """Install the managed add-on."""
+        addon_info = await self.async_get_addon_info()
+
+        if not addon_info.available:
+            raise AddonError(f"{self.addon_name} add-on is not available anymore")
+
         await async_install_addon(self._hass, self.addon_slug)
 
     @api_error("Failed to uninstall the {addon_name} add-on")
@@ -195,6 +202,9 @@ class AddonManager:
     async def async_update_addon(self) -> None:
         """Update the managed add-on if needed."""
         addon_info = await self.async_get_addon_info()
+
+        if not addon_info.available:
+            raise AddonError(f"{self.addon_name} add-on is not available anymore")
 
         if addon_info.state is AddonState.NOT_INSTALLED:
             raise AddonError(f"{self.addon_name} add-on is not installed")
@@ -369,7 +379,7 @@ class AddonManager:
                     self._logger.error(err)
                     break
 
-        return self._hass.async_create_task(addon_operation())
+        return self._hass.async_create_task(addon_operation(), eager_start=False)
 
 
 class AddonError(HomeAssistantError):

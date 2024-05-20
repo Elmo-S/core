@@ -26,14 +26,11 @@ async def async_setup_entry(
     """Config entry."""
     my_api = hass.data[DOMAIN][entry.entry_id]
     coordinator = MyCoordinator(hass, my_api)
-
+    # hass.states.async_set("hsl.testi2", "Läpi menu")
     await coordinator.async_config_entry_first_refresh()
 
     async_add_entities(
-        [
-            MyEntity(coordinator=coordinator, idx=idx, name="Boink")
-            for idx, ent in enumerate(coordinator.data)
-        ],
+        [MyEntity(coordinator=coordinator, name="Boink")],
         True,
     )
 
@@ -41,7 +38,8 @@ async def async_setup_entry(
 class PublicTransportSensor(SensorEntity):
     """HSL transport integration class."""
 
-    def __init__(self, name, station):
+
+    def __init__(self, name, station) -> None:
         """Initialize the sensor."""
         self._name = name
         self._station = station
@@ -55,7 +53,7 @@ class PublicTransportSensor(SensorEntity):
 class MyCoordinator(DataUpdateCoordinator):
     """Testing."""
 
-    def __init__(self, hass, my_api):
+    def __init__(self, hass: HomeAssistant, my_api) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass, _LOGGER, name="Namer", update_interval=timedelta(seconds=60)
@@ -71,10 +69,9 @@ class MyCoordinator(DataUpdateCoordinator):
 class MyEntity(CoordinatorEntity, SensorEntity):
     """Testing the tests."""
 
-    def __init__(self, coordinator, idx, name):
+    def __init__(self, coordinator, name) -> None:
         """Pass the coordinator to CoordinatorEntity."""
         super().__init__(coordinator)
-        self.idx = idx
         self._name = name
 
     @property
@@ -83,12 +80,18 @@ class MyEntity(CoordinatorEntity, SensorEntity):
         return self._name
 
     @property
-    def native_value(self):
+    def native_value(self) -> str:
         """Set state of entity."""
-        return "buuuuuip"
+        return self.coordinator.data["stop"]["stoptimesWithoutPatterns"][0]["timestamp"]
+
+    @property
+    def extra_state_attributes(self) -> None:
+        """Return the state attributes."""
+        # return {
+        #    "departure_time": self.coordinator.data["stop"]["stoptimesWithoutPatterns"]
+        # }
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle data update."""
-        self._attr_state = self.coordinator.data[self.idx]["state"]
         self.async_write_ha_state()

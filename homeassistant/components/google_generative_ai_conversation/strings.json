@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "api_key": "[%key:common::config_flow::data::api_key%]",
+          "llm_hass_api": "[%key:common::config_flow::data::llm_hass_api%]"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "Prompt Template",
+          "chat_model": "[%key:common::generic::model%]",
+          "temperature": "Temperature",
+          "top_p": "Top P",
+          "top_k": "Top K",
+          "max_tokens": "Maximum tokens to return in response",
+          "llm_hass_api": "[%key:common::config_flow::data::llm_hass_api%]"
+        }
+      }
+    }
+  },
+  "services": {
+    "generate_content": {
+      "name": "Generate content",
+      "description": "Generate content from a prompt consisting of text and optionally images",
+      "fields": {
+        "prompt": {
+          "name": "Prompt",
+          "description": "The prompt",
+          "example": "Describe what you see in these images"
+        },
+        "image_filename": {
+          "name": "Image filename",
+          "description": "Images",
+          "example": "/config/www/image.jpg"
+        }
+      }
+    }
+  }
+}

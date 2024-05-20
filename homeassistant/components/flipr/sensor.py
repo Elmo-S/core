@@ -1,4 +1,5 @@
 """Sensor platform for the Flipr's pool_sensor."""
+
 from __future__ import annotations
 
 from homeassistant.components.sensor import (
@@ -8,49 +9,45 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ELECTRIC_POTENTIAL_MILLIVOLT, PERCENTAGE, TEMP_CELSIUS
+from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import FliprEntity
 from .const import DOMAIN
+from .entity import FliprEntity
 
 SENSOR_TYPES: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
         key="chlorine",
-        name="Chlorine",
-        native_unit_of_measurement=ELECTRIC_POTENTIAL_MILLIVOLT,
-        icon="mdi:pool",
+        translation_key="chlorine",
+        native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="ph",
-        name="pH",
-        icon="mdi:pool",
+        device_class=SensorDeviceClass.PH,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="temperature",
-        name="Water Temp",
+        translation_key="water_temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit_of_measurement=TEMP_CELSIUS,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="date_time",
-        name="Last Measured",
+        translation_key="last_measured",
         device_class=SensorDeviceClass.TIMESTAMP,
     ),
     SensorEntityDescription(
         key="red_ox",
-        name="Red OX",
-        native_unit_of_measurement=ELECTRIC_POTENTIAL_MILLIVOLT,
-        icon="mdi:pool",
+        translation_key="red_ox",
+        native_unit_of_measurement=UnitOfElectricPotential.MILLIVOLT,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="battery",
-        name="Battery Level",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.BATTERY,

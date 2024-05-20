@@ -1,4 +1,5 @@
 """Support for Jewish Calendar binary sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -22,14 +23,14 @@ import homeassistant.util.dt as dt_util
 from . import DOMAIN
 
 
-@dataclass
+@dataclass(frozen=True)
 class JewishCalendarBinarySensorMixIns(BinarySensorEntityDescription):
     """Binary Sensor description mixin class for Jewish Calendar."""
 
     is_on: Callable[..., bool] = lambda _: False
 
 
-@dataclass
+@dataclass(frozen=True)
 class JewishCalendarBinarySensorEntityDescription(
     JewishCalendarBinarySensorMixIns, BinarySensorEntityDescription
 ):
@@ -46,12 +47,12 @@ BINARY_SENSORS: tuple[JewishCalendarBinarySensorEntityDescription, ...] = (
     JewishCalendarBinarySensorEntityDescription(
         key="erev_shabbat_hag",
         name="Erev Shabbat/Hag",
-        is_on=lambda state: bool(state.erev_shabbat_hag),
+        is_on=lambda state: bool(state.erev_shabbat_chag),
     ),
     JewishCalendarBinarySensorEntityDescription(
         key="motzei_shabbat_hag",
         name="Motzei Shabbat/Hag",
-        is_on=lambda state: bool(state.motzei_shabbat_hag),
+        is_on=lambda state: bool(state.motzei_shabbat_chag),
     ),
 )
 
@@ -115,6 +116,13 @@ class JewishCalendarBinarySensor(BinarySensorEntity):
         """Run when entity about to be added to hass."""
         await super().async_added_to_hass()
         self._schedule_update()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity will be removed from hass."""
+        if self._update_unsub:
+            self._update_unsub()
+            self._update_unsub = None
+        return await super().async_will_remove_from_hass()
 
     @callback
     def _update(self, now: datetime | None = None) -> None:

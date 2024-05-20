@@ -1,7 +1,6 @@
 """Support for Kegtron sensors."""
-from __future__ import annotations
 
-from typing import Optional, Union
+from __future__ import annotations
 
 from kegtron_ble import (
     SensorDeviceClass as KegtronSensorDeviceClass,
@@ -22,9 +21,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import SIGNAL_STRENGTH_DECIBELS_MILLIWATT, VOLUME_LITERS
+from homeassistant.const import (
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    EntityCategory,
+    UnitOfVolume,
+)
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
 
@@ -39,9 +41,8 @@ SENSOR_DESCRIPTIONS = {
     KegtronSensorDeviceClass.KEG_SIZE: SensorEntityDescription(
         key=KegtronSensorDeviceClass.KEG_SIZE,
         icon="mdi:keg",
-        native_unit_of_measurement=VOLUME_LITERS,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
         device_class=SensorDeviceClass.VOLUME,
-        state_class=SensorStateClass.MEASUREMENT,
     ),
     KegtronSensorDeviceClass.KEG_TYPE: SensorEntityDescription(
         key=KegtronSensorDeviceClass.KEG_TYPE,
@@ -50,14 +51,13 @@ SENSOR_DESCRIPTIONS = {
     KegtronSensorDeviceClass.VOLUME_START: SensorEntityDescription(
         key=KegtronSensorDeviceClass.VOLUME_START,
         icon="mdi:keg",
-        native_unit_of_measurement=VOLUME_LITERS,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
         device_class=SensorDeviceClass.VOLUME,
-        state_class=SensorStateClass.MEASUREMENT,
     ),
     KegtronSensorDeviceClass.VOLUME_DISPENSED: SensorEntityDescription(
         key=KegtronSensorDeviceClass.VOLUME_DISPENSED,
         icon="mdi:keg",
-        native_unit_of_measurement=VOLUME_LITERS,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
         device_class=SensorDeviceClass.VOLUME,
         state_class=SensorStateClass.TOTAL,
     ),
@@ -127,7 +127,7 @@ async def async_setup_entry(
 
 class KegtronBluetoothSensorEntity(
     PassiveBluetoothProcessorEntity[
-        PassiveBluetoothDataProcessor[Optional[Union[float, int]]]
+        PassiveBluetoothDataProcessor[float | int | None, SensorUpdate]
     ],
     SensorEntity,
 ):

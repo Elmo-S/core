@@ -1,11 +1,12 @@
 """Expose Radio Browser as a media source."""
+
 from __future__ import annotations
 
 import mimetypes
 
 from radios import FilterBy, Order, RadioBrowser, Station
 
-from homeassistant.components.media_player import BrowseError, MediaClass, MediaType
+from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source.error import Unresolvable
 from homeassistant.components.media_source.models import (
     BrowseMediaSource,
@@ -13,9 +14,9 @@ from homeassistant.components.media_source.models import (
     MediaSourceItem,
     PlayMedia,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
+from . import RadioBrowserConfigEntry
 from .const import DOMAIN
 
 CODEC_TO_MIMETYPE = {
@@ -28,7 +29,7 @@ CODEC_TO_MIMETYPE = {
 
 async def async_get_media_source(hass: HomeAssistant) -> RadioMediaSource:
     """Set up Radio Browser media source."""
-    # Radio browser support only a single config entry
+    # Radio browser supports only a single config entry
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
     return RadioMediaSource(hass, entry)
@@ -39,23 +40,20 @@ class RadioMediaSource(MediaSource):
 
     name = "Radio Browser"
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Initialize CameraMediaSource."""
+    def __init__(self, hass: HomeAssistant, entry: RadioBrowserConfigEntry) -> None:
+        """Initialize RadioMediaSource."""
         super().__init__(DOMAIN)
         self.hass = hass
         self.entry = entry
 
     @property
-    def radios(self) -> RadioBrowser | None:
+    def radios(self) -> RadioBrowser:
         """Return the radio browser."""
-        return self.hass.data.get(DOMAIN)
+        return self.entry.runtime_data
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
         """Resolve selected Radio station to a streaming URL."""
         radios = self.radios
-
-        if radios is None:
-            raise Unresolvable("Radio Browser not initialized")
 
         station = await radios.station(uuid=item.identifier)
         if not station:
@@ -75,9 +73,6 @@ class RadioMediaSource(MediaSource):
     ) -> BrowseMediaSource:
         """Return media."""
         radios = self.radios
-
-        if radios is None:
-            raise BrowseError("Radio Browser not initialized")
 
         return BrowseMediaSource(
             domain=DOMAIN,

@@ -1,20 +1,21 @@
 """Support for Lidarr."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
-from copy import deepcopy
-from dataclasses import dataclass
+import dataclasses
 from typing import Any, Generic
 
 from aiopyarr import LidarrQueue, LidarrQueueItem, LidarrRootFolder
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import DATA_GIGABYTES
+from homeassistant.const import UnitOfInformation
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -29,7 +30,9 @@ def get_space(data: list[LidarrRootFolder], name: str) -> str:
     for mount in data:
         if name in mount.path:
             mount.freeSpace = mount.freeSpace if mount.accessible else 0
-            space.append(mount.freeSpace / 1024 ** BYTE_SIZES.index(DATA_GIGABYTES))
+            space.append(
+                mount.freeSpace / 1024 ** BYTE_SIZES.index(UnitOfInformation.GIGABYTES)
+            )
     return f"{space[0]:.2f}"
 
 
@@ -37,57 +40,60 @@ def get_modified_description(
     description: LidarrSensorEntityDescription[T], mount: LidarrRootFolder
 ) -> tuple[LidarrSensorEntityDescription[T], str]:
     """Return modified description and folder name."""
-    desc = deepcopy(description)
     name = mount.path.rsplit("/")[-1].rsplit("\\")[-1]
-    desc.key = f"{description.key}_{name}"
-    desc.name = f"{description.name} {name}".capitalize()
+    desc = dataclasses.replace(
+        description,
+        key=f"{description.key}_{name}",
+        name=f"{description.name} {name}".capitalize(),
+    )
     return desc, name
 
 
-@dataclass
+@dataclasses.dataclass(frozen=True)
 class LidarrSensorEntityDescriptionMixIn(Generic[T]):
     """Mixin for required keys."""
 
     value_fn: Callable[[T, str], str | int]
 
 
-@dataclass
+@dataclasses.dataclass(frozen=True)
 class LidarrSensorEntityDescription(
     SensorEntityDescription, LidarrSensorEntityDescriptionMixIn[T], Generic[T]
 ):
     """Class to describe a Lidarr sensor."""
 
     attributes_fn: Callable[[T], dict[str, str] | None] = lambda _: None
-    description_fn: Callable[
-        [LidarrSensorEntityDescription[T], LidarrRootFolder],
-        tuple[LidarrSensorEntityDescription[T], str] | None,
-    ] | None = None
+    description_fn: (
+        Callable[
+            [LidarrSensorEntityDescription[T], LidarrRootFolder],
+            tuple[LidarrSensorEntityDescription[T], str] | None,
+        ]
+        | None
+    ) = None
 
 
 SENSOR_TYPES: dict[str, LidarrSensorEntityDescription[Any]] = {
     "disk_space": LidarrSensorEntityDescription(
         key="disk_space",
-        name="Disk space",
-        native_unit_of_measurement=DATA_GIGABYTES,
-        icon="mdi:harddisk",
+        translation_key="disk_space",
+        native_unit_of_measurement=UnitOfInformation.GIGABYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
         value_fn=get_space,
         state_class=SensorStateClass.TOTAL,
         description_fn=get_modified_description,
     ),
     "queue": LidarrSensorEntityDescription[LidarrQueue](
         key="queue",
-        name="Queue",
+        translation_key="queue",
         native_unit_of_measurement="Albums",
-        icon="mdi:download",
         value_fn=lambda data, _: data.totalRecords,
         state_class=SensorStateClass.TOTAL,
         attributes_fn=lambda data: {i.title: queue_str(i) for i in data.records},
     ),
     "wanted": LidarrSensorEntityDescription[LidarrQueue](
         key="wanted",
-        name="Wanted",
+        translation_key="wanted",
         native_unit_of_measurement="Albums",
-        icon="mdi:music",
         value_fn=lambda data, _: data.totalRecords,
         state_class=SensorStateClass.TOTAL,
         entity_registry_enabled_default=False,
