@@ -42,6 +42,12 @@
         "state": {
           "on": "mdi:motion-sensor"
         }
+      },
+      "sleep": {
+        "default": "mdi:sleep-off",
+        "state": {
+          "on": "mdi:sleep"
+        }
       }
     },
     "button": {
@@ -197,6 +203,9 @@
       },
       "status_led": {
         "default": "mdi:lightning-bolt-circle"
+      },
+      "hdr": {
+        "default": "mdi:hdr"
       }
     },
     "sensor": {
@@ -256,6 +265,9 @@
         "default": "mdi:message-badge"
       },
       "record": {
+        "default": "mdi:record-rec"
+      },
+      "manual_record": {
         "default": "mdi:record-rec"
       },
       "buzzer": {

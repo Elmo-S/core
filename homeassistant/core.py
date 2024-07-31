@@ -55,6 +55,7 @@ from .const import (
     ATTR_FRIENDLY_NAME,
     ATTR_SERVICE,
     ATTR_SERVICE_DATA,
+    BASE_PLATFORMS,
     COMPRESSED_STATE_ATTRIBUTES,
     COMPRESSED_STATE_CONTEXT,
     COMPRESSED_STATE_LAST_CHANGED,
@@ -73,6 +74,7 @@ from .const import (
     EVENT_STATE_CHANGED,
     EVENT_STATE_REPORTED,
     MATCH_ALL,
+    MAX_EXPECTED_ENTITY_IDS,
     MAX_LENGTH_EVENT_EVENT_TYPE,
     MAX_LENGTH_STATE_STATE,
     UnitOfLength,
@@ -94,6 +96,7 @@ from .helpers.deprecation import (
     dir_with_deprecated_constants,
 )
 from .helpers.json import json_bytes, json_fragment
+from .helpers.typing import UNDEFINED, UndefinedType, VolSchemaType
 from .util import dt as dt_util, location
 from .util.async_ import (
     cancelling,
@@ -129,16 +132,13 @@ FINAL_WRITE_STAGE_SHUTDOWN_TIMEOUT = 60
 CLOSE_STAGE_SHUTDOWN_TIMEOUT = 30
 
 
-_R = TypeVar("_R")
-# Internal; not helpers.typing.UNDEFINED due to circular dependency
-_UNDEF: dict[Any, Any] = {}
 _SENTINEL = object()
 _DataT = TypeVar("_DataT", bound=Mapping[str, Any], default=Mapping[str, Any])
 type CALLBACK_TYPE = Callable[[], None]
 
 CORE_STORAGE_KEY = "core.config"
 CORE_STORAGE_VERSION = 1
-CORE_STORAGE_MINOR_VERSION = 3
+CORE_STORAGE_MINOR_VERSION = 4
 
 DOMAIN = "homeassistant"
 
@@ -158,12 +158,29 @@ class ConfigSource(enum.StrEnum):
     YAML = "yaml"
 
 
-class EventStateChangedData(TypedDict):
-    """EventStateChanged data."""
+class EventStateEventData(TypedDict):
+    """Base class for EVENT_STATE_CHANGED and EVENT_STATE_REPORTED data."""
 
     entity_id: str
-    old_state: State | None
     new_state: State | None
+
+
+class EventStateChangedData(EventStateEventData):
+    """EVENT_STATE_CHANGED data.
+
+    A state changed event is fired when on state write the state is changed.
+    """
+
+    old_state: State | None
+
+
+class EventStateReportedData(EventStateEventData):
+    """EVENT_STATE_REPORTED data.
+
+    A state reported event is fired when on state write the state is unchanged.
+    """
+
+    old_last_reported: datetime.datetime
 
 
 # SOURCE_* are deprecated as of Home Assistant 2022.2, use ConfigSource instead
@@ -177,7 +194,6 @@ _DEPRECATED_SOURCE_YAML = DeprecatedConstantEnum(ConfigSource.YAML, "2025.1")
 # How long to wait until things that run on startup have to finish.
 TIMEOUT_EVENT_START = 15
 
-MAX_EXPECTED_ENTITY_IDS = 16384
 
 EVENTS_EXCLUDED_FROM_MATCH_ALL = {
     EVENT_HOMEASSISTANT_CLOSE,
@@ -268,8 +284,16 @@ def async_get_hass() -> HomeAssistant:
     This should be used where it's very cumbersome or downright impossible to pass
     hass to the code which needs it.
     """
-    if not _hass.hass:
+    if not (hass := async_get_hass_or_none()):
         raise HomeAssistantError("async_get_hass called from the wrong thread")
+    return hass
+
+
+def async_get_hass_or_none() -> HomeAssistant | None:
+    """Return the HomeAssistant instance or None.
+
+    Returns None when called from the wrong thread.
+    """
     return _hass.hass
 
 
@@ -322,12 +346,15 @@ class HassJob[**_P, _R_co]:
         self.target: Final = target
         self.name = name
         self._cancel_on_shutdown = cancel_on_shutdown
-        self._job_type = job_type
+        if job_type:
+            # Pre-set the cached_property so we
+            # avoid the function call
+            self.__dict__["job_type"] = job_type
 
     @cached_property
     def job_type(self) -> HassJobType:
         """Return the job type."""
-        return self._job_type or get_hassjob_callable_job_type(self.target)
+        return get_hassjob_callable_job_type(self.target)
 
     @property
     def cancel_on_shutdown(self) -> bool | None:
@@ -423,24 +450,17 @@ class HomeAssistant:
         self.import_executor = InterruptibleThreadPoolExecutor(
             max_workers=1, thread_name_prefix="ImportExecutor"
         )
+        self.loop_thread_id = getattr(
+            self.loop, "_thread_ident", getattr(self.loop, "_thread_id")
+        )
 
     def verify_event_loop_thread(self, what: str) -> None:
         """Report and raise if we are not running in the event loop thread."""
-        if (
-            loop_thread_ident := self.loop.__dict__.get("_thread_ident")
-        ) and loop_thread_ident != threading.get_ident():
+        if self.loop_thread_id != threading.get_ident():
+            # frame is a circular import, so we import it here
             from .helpers import frame  # pylint: disable=import-outside-toplevel
 
-            # frame is a circular import, so we import it here
-            frame.report(
-                f"calls {what} from a thread other than the event loop, "
-                "which may cause Home Assistant to crash or data to corrupt. "
-                "For more information, see "
-                "https://developers.home-assistant.io/docs/asyncio_thread_safety/"
-                f"#{what.replace('.', '')}",
-                error_if_core=True,
-                error_if_integration=True,
-            )
+            frame.report_non_thread_safe_operation(what)
 
     @property
     def _active_tasks(self) -> set[asyncio.Future[Any]]:
@@ -693,7 +713,7 @@ class HomeAssistant:
 
     @overload
     @callback
-    def _async_add_hass_job(
+    def _async_add_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R]],
         *args: Any,
@@ -702,7 +722,7 @@ class HomeAssistant:
 
     @overload
     @callback
-    def _async_add_hass_job(
+    def _async_add_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R] | _R],
         *args: Any,
@@ -710,7 +730,7 @@ class HomeAssistant:
     ) -> asyncio.Future[_R] | None: ...
 
     @callback
-    def _async_add_hass_job(
+    def _async_add_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R] | _R],
         *args: Any,
@@ -781,16 +801,10 @@ class HomeAssistant:
 
         target: target to call.
         """
-        # We turned on asyncio debug in April 2024 in the dev containers
-        # in the hope of catching some of the issues that have been
-        # reported. It will take a while to get all the issues fixed in
-        # custom components.
-        #
-        # In 2025.5 we should guard the `verify_event_loop_thread`
-        # check with a check for the `hass.config.debug` flag being set as
-        # long term we don't want to be checking this in production
-        # environments since it is a performance hit.
-        self.verify_event_loop_thread("hass.async_create_task")
+        if self.loop_thread_id != threading.get_ident():
+            from .helpers import frame  # pylint: disable=import-outside-toplevel
+
+            frame.report_non_thread_safe_operation("hass.async_create_task")
         return self.async_create_task_internal(target, name, eager_start)
 
     @callback
@@ -857,7 +871,7 @@ class HomeAssistant:
         return task
 
     @callback
-    def async_add_executor_job[_T, *_Ts](
+    def async_add_executor_job[*_Ts, _T](
         self, target: Callable[[*_Ts], _T], *args: *_Ts
     ) -> asyncio.Future[_T]:
         """Add an executor job from within the event loop."""
@@ -871,7 +885,7 @@ class HomeAssistant:
         return task
 
     @callback
-    def async_add_import_executor_job[_T, *_Ts](
+    def async_add_import_executor_job[*_Ts, _T](
         self, target: Callable[[*_Ts], _T], *args: *_Ts
     ) -> asyncio.Future[_T]:
         """Add an import executor job from within the event loop.
@@ -882,7 +896,7 @@ class HomeAssistant:
 
     @overload
     @callback
-    def async_run_hass_job(
+    def async_run_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R]],
         *args: Any,
@@ -891,7 +905,7 @@ class HomeAssistant:
 
     @overload
     @callback
-    def async_run_hass_job(
+    def async_run_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R] | _R],
         *args: Any,
@@ -899,7 +913,7 @@ class HomeAssistant:
     ) -> asyncio.Future[_R] | None: ...
 
     @callback
-    def async_run_hass_job(
+    def async_run_hass_job[_R](
         self,
         hassjob: HassJob[..., Coroutine[Any, Any, _R] | _R],
         *args: Any,
@@ -1248,6 +1262,14 @@ class Context:
         """Compare contexts."""
         return isinstance(other, Context) and self.id == other.id
 
+    def __copy__(self) -> Context:
+        """Create a shallow copy of this context."""
+        return Context(user_id=self.user_id, parent_id=self.parent_id, id=self.id)
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Context:
+        """Create a deep copy of this context."""
+        return Context(user_id=self.user_id, parent_id=self.parent_id, id=self.id)
+
     @cached_property
     def _as_dict(self) -> dict[str, str | None]:
         """Return a dictionary representation of the context.
@@ -1285,6 +1307,11 @@ class EventOrigin(enum.Enum):
     def __str__(self) -> str:
         """Return the event."""
         return self.value
+
+    @cached_property
+    def idx(self) -> int:
+        """Return the index of the origin."""
+        return next((idx for idx, origin in enumerate(EventOrigin) if origin is self))
 
 
 class Event(Generic[_DataT]):
@@ -1423,7 +1450,9 @@ class EventBus:
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize a new event bus."""
-        self._listeners: dict[EventType[Any] | str, list[_FilterableJobType[Any]]] = {}
+        self._listeners: defaultdict[
+            EventType[Any] | str, list[_FilterableJobType[Any]]
+        ] = defaultdict(list)
         self._match_all_listeners: list[_FilterableJobType[Any]] = []
         self._listeners[MATCH_ALL] = self._match_all_listeners
         self._hass = hass
@@ -1475,7 +1504,10 @@ class EventBus:
         This method must be run in the event loop.
         """
         _verify_event_type_length_or_raise(event_type)
-        self._hass.verify_event_loop_thread("hass.bus.async_fire")
+        if self._hass.loop_thread_id != threading.get_ident():
+            from .helpers import frame  # pylint: disable=import-outside-toplevel
+
+            frame.report_non_thread_safe_operation("hass.bus.async_fire")
         return self.async_fire_internal(
             event_type, event_data, origin, context, time_fired
         )
@@ -1498,7 +1530,6 @@ class EventBus:
 
         This method must be run in the event loop.
         """
-
         if self._debug:
             _LOGGER.debug(
                 "Bus:Handling %s", _event_repr(event_type, origin, event_data)
@@ -1509,17 +1540,9 @@ class EventBus:
             match_all_listeners = self._match_all_listeners
         else:
             match_all_listeners = EMPTY_LIST
-        if event_type == EVENT_STATE_CHANGED:
-            aliased_listeners = self._listeners.get(EVENT_STATE_REPORTED, EMPTY_LIST)
-        else:
-            aliased_listeners = EMPTY_LIST
-        listeners = listeners + match_all_listeners + aliased_listeners
-        if not listeners:
-            return
 
         event: Event[_DataT] | None = None
-
-        for job, event_filter in listeners:
+        for job, event_filter in listeners + match_all_listeners:
             if event_filter is not None:
                 try:
                     if event_data is None or not event_filter(event_data):
@@ -1597,18 +1620,13 @@ class EventBus:
 
         if event_filter is not None and not is_callback_check_partial(event_filter):
             raise HomeAssistantError(f"Event filter {event_filter} is not a callback")
+        filterable_job = (HassJob(listener, f"listen {event_type}"), event_filter)
         if event_type == EVENT_STATE_REPORTED:
             if not event_filter:
                 raise HomeAssistantError(
                     f"Event filter is required for event {event_type}"
                 )
-        return self._async_listen_filterable_job(
-            event_type,
-            (
-                HassJob(listener, f"listen {event_type}"),
-                event_filter,
-            ),
-        )
+        return self._async_listen_filterable_job(event_type, filterable_job)
 
     @callback
     def _async_listen_filterable_job(
@@ -1616,7 +1634,8 @@ class EventBus:
         event_type: EventType[_DataT] | str,
         filterable_job: _FilterableJobType[_DataT],
     ) -> CALLBACK_TYPE:
-        self._listeners.setdefault(event_type, []).append(filterable_job)
+        """Listen for all events or events of a specific type."""
+        self._listeners[event_type].append(filterable_job)
         return functools.partial(
             self._async_remove_listener, event_type, filterable_job
         )
@@ -1745,6 +1764,7 @@ class State:
         context: Context | None = None,
         validate_entity_id: bool | None = True,
         state_info: StateInfo | None = None,
+        last_updated_timestamp: float | None = None,
     ) -> None:
         """Initialize a new state."""
         state = str(state)
@@ -1775,9 +1795,17 @@ class State:
         # The recorder or the websocket_api will always call the timestamps,
         # so we will set the timestamp values here to avoid the overhead of
         # the function call in the property we know will always be called.
-        self.last_updated_timestamp = self.last_updated.timestamp()
-        if self.last_changed == self.last_updated:
-            self.__dict__["last_changed_timestamp"] = self.last_updated_timestamp
+        last_updated = self.last_updated
+        if not last_updated_timestamp:
+            last_updated_timestamp = last_updated.timestamp()
+        self.last_updated_timestamp = last_updated_timestamp
+        if self.last_changed == last_updated:
+            self.__dict__["last_changed_timestamp"] = last_updated_timestamp
+        # If last_reported is the same as last_updated async_set will pass
+        # the same datetime object for both values so we can use an identity
+        # check here.
+        if self.last_reported is last_updated:
+            self.__dict__["last_reported_timestamp"] = last_updated_timestamp
 
     @cached_property
     def name(self) -> str:
@@ -1794,8 +1822,6 @@ class State:
     @cached_property
     def last_reported_timestamp(self) -> float:
         """Timestamp of last report."""
-        if self.last_reported == self.last_updated:
-            return self.last_updated_timestamp
         return self.last_reported.timestamp()
 
     @cached_property
@@ -2217,16 +2243,45 @@ class StateMachine:
 
         This method must be run in the event loop.
         """
-        new_state = str(new_state)
-        attributes = attributes or {}
-        old_state = self._states_data.get(entity_id)
-        if old_state is None:
-            # If the state is missing, try to convert the entity_id to lowercase
-            # and try again.
-            entity_id = entity_id.lower()
-            old_state = self._states_data.get(entity_id)
+        self.async_set_internal(
+            entity_id.lower(),
+            str(new_state),
+            attributes or {},
+            force_update,
+            context,
+            state_info,
+            timestamp or time.time(),
+        )
 
-        if old_state is None:
+    @callback
+    def async_set_internal(
+        self,
+        entity_id: str,
+        new_state: str,
+        attributes: Mapping[str, Any] | None,
+        force_update: bool,
+        context: Context | None,
+        state_info: StateInfo | None,
+        timestamp: float,
+    ) -> None:
+        """Set the state of an entity, add entity if it does not exist.
+
+        This method is intended to only be used by core internally
+        and should not be considered a stable API. We will make
+        breaking changes to this function in the future and it
+        should not be used in integrations.
+
+        This method must be run in the event loop.
+        """
+        # Most cases the key will be in the dict
+        # so we optimize for the happy path as
+        # python 3.11+ has near zero overhead for
+        # try when it does not raise an exception.
+        old_state: State | None
+        try:
+            old_state = self._states_data[entity_id]
+        except KeyError:
+            old_state = None
             same_state = False
             same_attr = False
             last_changed = None
@@ -2246,15 +2301,18 @@ class StateMachine:
         # timestamp implementation:
         # https://github.com/python/cpython/blob/c90a862cdcf55dc1753c6466e5fa4a467a13ae24/Modules/_datetimemodule.c#L6387
         # https://github.com/python/cpython/blob/c90a862cdcf55dc1753c6466e5fa4a467a13ae24/Modules/_datetimemodule.c#L6323
-        if timestamp is None:
-            timestamp = time.time()
         now = dt_util.utc_from_timestamp(timestamp)
+
+        if context is None:
+            context = Context(id=ulid_at_time(timestamp))
 
         if same_state and same_attr:
             # mypy does not understand this is only possible if old_state is not None
             old_last_reported = old_state.last_reported  # type: ignore[union-attr]
             old_state.last_reported = now  # type: ignore[union-attr]
-            self._bus.async_fire_internal(
+            old_state.last_reported_timestamp = timestamp  # type: ignore[union-attr]
+            # Avoid creating an EventStateReportedData
+            self._bus.async_fire_internal(  # type: ignore[misc]
                 EVENT_STATE_REPORTED,
                 {
                     "entity_id": entity_id,
@@ -2265,9 +2323,6 @@ class StateMachine:
                 time_fired=timestamp,
             )
             return
-
-        if context is None:
-            context = Context(id=ulid_at_time(timestamp))
 
         if same_attr:
             if TYPE_CHECKING:
@@ -2286,6 +2341,7 @@ class StateMachine:
             context,
             old_state is None,
             state_info,
+            timestamp,
         )
         if old_state is not None:
             old_state.expire()
@@ -2330,7 +2386,7 @@ class Service:
             | EntityServiceResponse
             | None,
         ],
-        schema: vol.Schema | None,
+        schema: VolSchemaType | None,
         domain: str,
         service: str,
         context: Context | None = None,
@@ -2478,7 +2534,7 @@ class ServiceRegistry:
             | EntityServiceResponse
             | None,
         ],
-        schema: vol.Schema | None = None,
+        schema: VolSchemaType | None = None,
         supports_response: SupportsResponse = SupportsResponse.NONE,
         job_type: HassJobType | None = None,
     ) -> None:
@@ -2505,7 +2561,7 @@ class ServiceRegistry:
             | EntityServiceResponse
             | None,
         ],
-        schema: vol.Schema | None = None,
+        schema: VolSchemaType | None = None,
         supports_response: SupportsResponse = SupportsResponse.NONE,
         job_type: HassJobType | None = None,
     ) -> None:
@@ -2768,16 +2824,27 @@ class _ComponentSet(set[str]):
 
     The top level components set only contains the top level components.
 
+    The all components set contains all components, including platform
+    based components.
+
     """
 
-    def __init__(self, top_level_components: set[str]) -> None:
+    def __init__(
+        self, top_level_components: set[str], all_components: set[str]
+    ) -> None:
         """Initialize the component set."""
         self._top_level_components = top_level_components
+        self._all_components = all_components
 
     def add(self, component: str) -> None:
         """Add a component to the store."""
         if "." not in component:
             self._top_level_components.add(component)
+            self._all_components.add(component)
+        else:
+            platform, _, domain = component.partition(".")
+            if domain in BASE_PLATFORMS:
+                self._all_components.add(platform)
         return super().add(component)
 
     def remove(self, component: str) -> None:
@@ -2799,6 +2866,9 @@ class Config:
 
     def __init__(self, hass: HomeAssistant, config_dir: str) -> None:
         """Initialize a new config object."""
+        # pylint: disable-next=import-outside-toplevel
+        from .components.zone import DEFAULT_RADIUS
+
         self.hass = hass
 
         self.latitude: float = 0
@@ -2806,6 +2876,9 @@ class Config:
 
         self.elevation: int = 0
         """Elevation (always in meters regardless of the unit system)."""
+
+        self.radius: int = DEFAULT_RADIUS
+        """Radius of the Home Zone (always in meters regardless of the unit system)."""
 
         self.debug: bool = False
         self.location_name: str = "Home"
@@ -2830,8 +2903,14 @@ class Config:
         # and should not be modified directly
         self.top_level_components: set[str] = set()
 
+        # Set of all loaded components including platform
+        # based components
+        self.all_components: set[str] = set()
+
         # Set of loaded components
-        self.components: _ComponentSet = _ComponentSet(self.top_level_components)
+        self.components: _ComponentSet = _ComponentSet(
+            self.top_level_components, self.all_components
+        )
 
         # API (HTTP) server configuration
         self.api: ApiConfig | None = None
@@ -2949,6 +3028,7 @@ class Config:
             "language": self.language,
             "safe_mode": self.safe_mode,
             "debug": self.debug,
+            "radius": self.radius,
         }
 
     async def async_set_time_zone(self, time_zone_str: str) -> None:
@@ -2992,12 +3072,12 @@ class Config:
         unit_system: str | None = None,
         location_name: str | None = None,
         time_zone: str | None = None,
-        # pylint: disable=dangerous-default-value # _UNDEFs not modified
-        external_url: str | dict[Any, Any] | None = _UNDEF,
-        internal_url: str | dict[Any, Any] | None = _UNDEF,
+        external_url: str | UndefinedType | None = UNDEFINED,
+        internal_url: str | UndefinedType | None = UNDEFINED,
         currency: str | None = None,
-        country: str | dict[Any, Any] | None = _UNDEF,
+        country: str | UndefinedType | None = UNDEFINED,
         language: str | None = None,
+        radius: int | None = None,
     ) -> None:
         """Update the configuration from a dictionary."""
         self.config_source = source
@@ -3016,16 +3096,18 @@ class Config:
             self.location_name = location_name
         if time_zone is not None:
             await self.async_set_time_zone(time_zone)
-        if external_url is not _UNDEF:
-            self.external_url = cast(str | None, external_url)
-        if internal_url is not _UNDEF:
-            self.internal_url = cast(str | None, internal_url)
+        if external_url is not UNDEFINED:
+            self.external_url = external_url
+        if internal_url is not UNDEFINED:
+            self.internal_url = internal_url
         if currency is not None:
             self.currency = currency
-        if country is not _UNDEF:
-            self.country = cast(str | None, country)
+        if country is not UNDEFINED:
+            self.country = country
         if language is not None:
             self.language = language
+        if radius is not None:
+            self.radius = radius
 
     async def async_update(self, **kwargs: Any) -> None:
         """Update the configuration from a dictionary."""
@@ -3069,11 +3151,12 @@ class Config:
             unit_system=data.get("unit_system_v2"),
             location_name=data.get("location_name"),
             time_zone=data.get("time_zone"),
-            external_url=data.get("external_url", _UNDEF),
-            internal_url=data.get("internal_url", _UNDEF),
+            external_url=data.get("external_url", UNDEFINED),
+            internal_url=data.get("internal_url", UNDEFINED),
             currency=data.get("currency"),
             country=data.get("country"),
             language=data.get("language"),
+            radius=data["radius"],
         )
 
     async def _async_store(self) -> None:
@@ -3092,6 +3175,7 @@ class Config:
             "currency": self.currency,
             "country": self.country,
             "language": self.language,
+            "radius": self.radius,
         }
         await self._store.async_save(data)
 
@@ -3121,6 +3205,10 @@ class Config:
             old_data: dict[str, Any],
         ) -> dict[str, Any]:
             """Migrate to the new version."""
+
+            # pylint: disable-next=import-outside-toplevel
+            from .components.zone import DEFAULT_RADIUS
+
             data = old_data
             if old_major_version == 1 and old_minor_version < 2:
                 # In 1.2, we remove support for "imperial", replaced by "us_customary"
@@ -3157,6 +3245,9 @@ class Config:
                 # pylint: disable-next=broad-except
                 except Exception:
                     _LOGGER.exception("Unexpected error during core config migration")
+            if old_major_version == 1 and old_minor_version < 4:
+                # In 1.4, we add the key "radius", initialize it with the default.
+                data.setdefault("radius", DEFAULT_RADIUS)
 
             if old_major_version > 1:
                 raise NotImplementedError
