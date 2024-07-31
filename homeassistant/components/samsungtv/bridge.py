@@ -165,6 +165,7 @@ class SamsungTVBridge(ABC):
         self.host = host
         self.token: str | None = None
         self.session_id: str | None = None
+        self.auth_failed: bool = False
         self._reauth_callback: CALLBACK_TYPE | None = None
         self._update_config_entry: Callable[[Mapping[str, Any]], None] | None = None
         self._app_list_callback: Callable[[dict[str, str]], None] | None = None
@@ -320,9 +321,14 @@ class SamsungTVLegacyBridge(SamsungTVBridge):
             LOGGER.debug("Failing config: %s, error: %s", config, err)
             return RESULT_CANNOT_CONNECT
 
-    async def async_device_info(self) -> None:
+    async def async_device_info(self) -> dict[str, Any] | None:
         """Try to gather infos of this device."""
         return None
+
+    def _notify_reauth_callback(self) -> None:
+        """Notify access denied callback."""
+        if self._reauth_callback is not None:
+            self.hass.loop.call_soon_threadsafe(self._reauth_callback)
 
     def _get_remote(self) -> Remote:
         """Create or return a remote control instance."""
@@ -335,6 +341,7 @@ class SamsungTVLegacyBridge(SamsungTVBridge):
             # A removed auth will lead to socket timeout because waiting
             # for auth popup is just an open socket
             except AccessDenied:
+                self.auth_failed = True
                 self._notify_reauth_callback()
                 raise
             except (ConnectionClosed, OSError):
@@ -607,6 +614,7 @@ class SamsungTVWSBridge(
                     self.host,
                     repr(err),
                 )
+                self.auth_failed = True
                 self._notify_reauth_callback()
                 self._remote = None
             except ConnectionClosedError as err:
