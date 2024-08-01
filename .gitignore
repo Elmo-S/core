@@ -1,4 +1,5 @@
-/config
+/config/www/custom_components/finnish-public-transport
+/config/www/finnish-public-transport-card
 config2/*
 
 tests/testing_config/deps
