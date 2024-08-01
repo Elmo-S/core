@@ -11,7 +11,8 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "mounts": [
-    "source=C:\\HA\\finnish-public-transport\\custom_components,target=/workspaces/core/config/www/custom_components,type=bind,consistency=cached"
+    "source=C:\\HA\\finnish-public-transport\\custom_components\\finnish-public-transport,target=/workspaces/core/config/custom_components/finnish-public-transport,type=bind,consistency=cached",
+    "source=C:\\HA\\finnish-public-transport-card,target=/workspaces/core/config/www/finnish-public-transport-card,type=bind,consistency=cached"
   ],
   // Port 5683 udp is used by Shelly integration
   "appPort": ["8123:8123", "5683:5683/udp"],
