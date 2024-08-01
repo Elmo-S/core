@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "auth_provider.homeassistant",
+  "data": {
+    "users": [
+      {
+        "username": "elmo",
+        "password": "JDJiJDEyJGl4Rkg0UzhxckFLS003MXI5L0lIR09sU0VBc1NDWUY3alpDcnR1cTFkSkxmdWtKYU1mSEVX"
+      }
+    ]
+  }
+}

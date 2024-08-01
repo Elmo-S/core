@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace_resources",
+  "data": {
+    "items": [
+      {
+        "id": "c83a7e51af4945749f6566ec305d4ad9",
+        "url": "/local/finnish-public-transport-card/dist/card.js",
+        "type": "module"
+      }
+    ]
+  }
+}

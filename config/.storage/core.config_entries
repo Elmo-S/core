@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "minor_version": 3,
+  "key": "core.config_entries",
+  "data": {
+    "entries": [
+      {
+        "created_at": "2024-08-01T12:39:40.923041+00:00",
+        "data": {},
+        "disabled_by": null,
+        "domain": "sun",
+        "entry_id": "01J46Z80KTAFESM6PDQXJNTS25",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T12:39:40.923048+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "import",
+        "title": "Sun",
+        "unique_id": null,
+        "version": 1
+      },
+      {
+        "created_at": "2024-08-01T12:42:27.097040+00:00",
+        "data": {},
+        "disabled_by": null,
+        "domain": "shopping_list",
+        "entry_id": "01J46ZD2WRQ8R39XHWEB7Y990V",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T12:42:27.097045+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "onboarding",
+        "title": "Shopping list",
+        "unique_id": "shopping_list",
+        "version": 1
+      },
+      {
+        "created_at": "2024-08-01T12:42:30.650682+00:00",
+        "data": {
+          "language": "en",
+          "tld": "com"
+        },
+        "disabled_by": null,
+        "domain": "google_translate",
+        "entry_id": "01J46ZD6BTA352KYZXDGKA13XM",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T12:42:30.650688+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "onboarding",
+        "title": "Google Translate text-to-speech",
+        "unique_id": null,
+        "version": 1
+      },
+      {
+        "created_at": "2024-08-01T12:42:34.266123+00:00",
+        "data": {
+          "track_home": true
+        },
+        "disabled_by": null,
+        "domain": "met",
+        "entry_id": "01J46ZD9WTWGA3HG0WXJD93HRP",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T12:42:34.266129+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "onboarding",
+        "title": "Home",
+        "unique_id": null,
+        "version": 1
+      },
+      {
+        "created_at": "2024-08-01T12:42:43.558453+00:00",
+        "data": {},
+        "disabled_by": null,
+        "domain": "radio_browser",
+        "entry_id": "01J46ZDJZ5N3GHEV1W4WK8W03F",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T12:42:43.558466+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "onboarding",
+        "title": "Radio Browser",
+        "unique_id": null,
+        "version": 1
+      },
+      {
+        "created_at": "2024-08-01T13:35:35.288513+00:00",
+        "data": {
+          "api_key": "c61f2289a9d9496dbe1e8cb88e909e67"
+        },
+        "disabled_by": null,
+        "domain": "hsl",
+        "entry_id": "01J472ECBR3N595NR0NWQRTSGW",
+        "minor_version": 1,
+        "modified_at": "2024-08-01T13:35:35.288528+00:00",
+        "options": {},
+        "pref_disable_new_entities": false,
+        "pref_disable_polling": false,
+        "source": "user",
+        "title": "Testering",
+        "unique_id": null,
+        "version": 1
+      }
+    ]
+  }
+}

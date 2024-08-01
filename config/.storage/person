@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "minor_version": 1,
+  "key": "person",
+  "data": {
+    "items": [
+      {
+        "id": "elmo",
+        "name": "elmo",
+        "user_id": "96d25dec109744f9a3e52affb7240886",
+        "device_trackers": []
+      }
+    ]
+  }
+}

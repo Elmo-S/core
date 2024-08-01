@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "core.restore_state",
+  "data": [
+    {
+      "state": {"entity_id":"person.elmo","state":"unknown","attributes":{"editable":true,"id":"elmo","device_trackers":[],"source":"person.elmo","user_id":"96d25dec109744f9a3e52affb7240886","friendly_name":"elmo"},"last_changed":"2024-08-01T14:21:18.790103+00:00","last_reported":"2024-08-01T14:21:18.790103+00:00","last_updated":"2024-08-01T14:21:18.790103+00:00","context":{"id":"01J47523J6FCVZ5TH5W2HPX7A7","parent_id":null,"user_id":null}},
+      "extra_data": null,
+      "last_seen": "2024-08-01T14:21:44.741641+00:00"
+    },
+    {
+      "state": {"entity_id":"conversation.home_assistant","state":"unknown","attributes":{"friendly_name":"Home Assistant","supported_features":1},"last_changed":"2024-08-01T14:21:20.482802+00:00","last_reported":"2024-08-01T14:21:20.482802+00:00","last_updated":"2024-08-01T14:21:20.482802+00:00","context":{"id":"01J47525728HQ514GMEYMXRMZV","parent_id":null,"user_id":null}},
+      "extra_data": null,
+      "last_seen": "2024-08-01T14:21:44.741641+00:00"
+    },
+    {
+      "state": {"entity_id":"tts.google_en_com","state":"unknown","attributes":{"friendly_name":"Google en com"},"last_changed":"2024-08-01T14:21:20.900219+00:00","last_reported":"2024-08-01T14:21:20.900219+00:00","last_updated":"2024-08-01T14:21:20.900219+00:00","context":{"id":"01J47525M4DS8ZH14WQ3YQH1KZ","parent_id":null,"user_id":null}},
+      "extra_data": null,
+      "last_seen": "2024-08-01T14:21:44.741641+00:00"
+    }
+  ]
+}
